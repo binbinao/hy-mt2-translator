@@ -110,9 +110,9 @@ async function fetchJson(url, timeoutMs = 30_000) {
 }
 
 /** File list (name, size, lfs sha256) from the HF API, or null if unavailable. */
-async function apiFileList(endpoint) {
+async function apiFileList(endpoint, timeoutMs = 5000) {
   try {
-    const data = await fetchJson(`${endpoint}/api/models/${REPO}?blobs=true`);
+    const data = await fetchJson(`${endpoint}/api/models/${REPO}?blobs=true`, timeoutMs);
     const files = new Map();
     for (const sibling of data.siblings ?? []) {
       files.set(sibling.rfilename, {
@@ -123,7 +123,7 @@ async function apiFileList(endpoint) {
     }
     return files;
   } catch {
-    return null; // some mirrors do not proxy the API; fall back to HEAD probes
+    return null; // unreachable, or a mirror that does not proxy the API
   }
 }
 
@@ -142,26 +142,18 @@ async function probeRemote(endpoint, file, apiFiles) {
   return { name: file, size: Number(total), sha256: null };
 }
 
-async function reachable(endpoint) {
-  try {
-    const res = await fetch(`${endpoint}/api/models/${REPO}`, { signal: AbortSignal.timeout(8000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-/** Prefer the requested endpoint; fall back to the mirror if it is unreachable. */
+/**
+ * Picks the endpoint to use. The API call doubles as the reachability probe, so
+ * an unreachable primary costs one short timeout instead of a separate 8s wait.
+ */
 async function resolveEndpoint(opts) {
-  if (await reachable(opts.endpoint)) return opts.endpoint;
+  const files = await apiFileList(opts.endpoint);
+  if (files) return { endpoint: opts.endpoint, files };
   if (opts.explicitEndpoint || opts.endpoint === FALLBACK_ENDPOINT) {
-    throw new Error(`无法连接 ${opts.endpoint}（网络不可达或需要代理）`);
+    return { endpoint: opts.endpoint, files: null }; // let the download itself report failure
   }
-  say(opts.quiet, `⚠ ${opts.endpoint} 不可达，改用镜像 ${FALLBACK_ENDPOINT}`);
-  if (!await reachable(FALLBACK_ENDPOINT)) {
-    throw new Error(`无法连接 ${opts.endpoint}，镜像 ${FALLBACK_ENDPOINT} 也不可达`);
-  }
-  return FALLBACK_ENDPOINT;
+  say(opts.quiet, `⚠ ${opts.endpoint} 无响应，改用镜像 ${FALLBACK_ENDPOINT}`);
+  return { endpoint: FALLBACK_ENDPOINT, files: await apiFileList(FALLBACK_ENDPOINT) };
 }
 
 /* -------------------------------------------------------------- download */
@@ -172,24 +164,25 @@ async function sha256File(filePath) {
   return hash.digest('hex');
 }
 
-function progressPrinter(name, total, quiet) {
+function progressPrinter(total, quiet, startOffset = 0) {
   if (quiet) return () => {};
   const tty = process.stdout.isTTY;
   const startedAt = Date.now();
-  let nextMark = 0;
+  let nextMark = 10; // first non-TTY line at 10%, so we never print a meaningless 0.0%
   return (received) => {
     const pct = total ? (received / total) * 100 : 0;
     const seconds = Math.max(0.001, (Date.now() - startedAt) / 1000);
-    const rate = received / seconds;
+    // Rate and ETA describe this run, not the bytes inherited from a resume.
+    const rate = Math.max(0, received - startOffset) / seconds;
     const eta = total && rate > 0 ? ` ETA ${Math.round((total - received) / rate)}s` : '';
     const line = `  ${pct.toFixed(1)}%  ${human(received)}/${human(total)}  ${human(rate)}/s${eta}`;
     if (tty) {
       process.stdout.write(`\r${line}   `);
       return;
     }
-    if (pct >= nextMark) { // non-TTY: about four lines per download
+    if (pct >= nextMark) { // non-TTY: roughly ten lines per download
       process.stdout.write(`${line}\n`);
-      nextMark = Math.floor(pct / 25) * 25 + 25;
+      nextMark = Math.floor(pct / 10) * 10 + 10;
     }
   };
 }
@@ -222,7 +215,7 @@ async function download({ endpoint, file, size, outDir, quiet }) {
   }, 5000);
 
   let received = offset;
-  const report = progressPrinter(path.basename(file), size, quiet);
+  const report = progressPrinter(size, quiet, offset);
   const out = createWriteStream(partPath, { flags: offset > 0 ? 'a' : 'w' });
 
   try {
@@ -268,8 +261,7 @@ async function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (opts.help) { process.stdout.write(usage()); return; }
 
-  const endpoint = await resolveEndpoint(opts);
-  const apiFiles = await apiFileList(endpoint);
+  const { endpoint, files: apiFiles } = await resolveEndpoint(opts);
 
   if (opts.list) {
     if (!apiFiles) throw new Error(`${endpoint} 不提供文件列表 API`);
