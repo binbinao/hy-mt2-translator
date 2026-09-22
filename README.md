@@ -242,7 +242,17 @@ npm start            # → http://127.0.0.1:8787
 
 The first request starts `llama-server` against `Hy-MT2-1.8B-Q4_K_M.gguf` (`-c 8192 -ngl 0`) and reaps it on exit; a server already listening on `127.0.0.1:8080` is reused instead. Markdown imports keep their structure: headings, lists, links and code fences survive, only the visible text is translated.
 
-The same UI also runs as plain static files with no backend (`npm run build:pages` emits `docs/`), in which case the browser talks directly to an OpenAI-compatible endpoint configured on the page. GitHub Pages can host that static build, but not `server.mjs` — Pages has no Node runtime and cannot launch `llama-server`.
+The same UI also runs as plain static files with no backend: `npm run build:pages` emits `docs/`, published at **https://binbinao.github.io/hy-mt2-translator/**. In that mode the browser talks directly to an OpenAI-compatible endpoint configured on the page.
+
+What GitHub Pages can and cannot do for this project (as measured, not assumed):
+
+| | |
+|---|---|
+| ✅ Hosts the static UI | The page and all modules load under the `/hy-mt2-translator/` sub-path. |
+| ❌ Cannot run `server.mjs` | Pages has no Node runtime, so nothing can spawn `llama-server`, and the 2000-character limit is only enforced client-side. |
+| ❌ Cannot reach a model on your machine | Browsers block a public HTTPS page from calling `http://127.0.0.1` (local network access policy); the request fails immediately with `Failed to fetch`. `llama-server` also does not send the `Access-Control-Allow-Private-Network` opt-in header. |
+
+So: use **local mode** (`npm start`) with a local model, and the Pages build only with an HTTPS endpoint that is publicly reachable.
 
 ## Quantization Tool
 

@@ -185,7 +185,8 @@ async function testConn() {
       `无法连接 ${endpoint}：${String(err.message ?? err)}\n`
       + '请确认已启动服务，例如：\n'
       + 'llama-server -m Hy-MT2-1.8B-Q4_K_M.gguf --host 127.0.0.1 --port 8080 -c 8192 -ngl 0\n'
-      + '若页面是 https 而服务是 http，浏览器可能以“本地网络访问”策略拦截，此时请改用本地模式（npm start）。',
+      + '注意：https 页面无法访问 http://127.0.0.1（浏览器本地网络访问策略会直接拦截，报 Failed to fetch）。\n'
+      + '本地模型请用本地模式 cd webapp && npm start；要用本页则需 HTTPS 公网端点。',
     );
     setStatus('连接失败');
   }
@@ -531,7 +532,12 @@ function fillTargets(defaultTarget) {
     fillTargets('en');
     paintConn();
     el.conn.hidden = false;
-    showNotice('这是静态托管版本：没有后端，请先启动你自己的 OpenAI 兼容服务（默认 http://127.0.0.1:8080），再点“测试连接”。', 'info');
+    showNotice(
+      '这是静态托管版本：没有后端。请填入一个能从本页访问的 OpenAI 兼容端点。\n'
+      + '· 本地模型请改用本地模式：cd webapp && npm start（浏览器会拦截 https 页面对 http://127.0.0.1 的请求）；\n'
+      + '· 想在这个页面上直接用远端模型，端点必须是 HTTPS 公网地址。',
+      'info',
+    );
     setStatus('等待配置端点');
   }
 
