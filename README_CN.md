@@ -231,12 +231,25 @@ Hy-MT2提供了完整的模型训练流程，支持全量微调和 LoRA 微调�
 
 本 GGUF 版本附带一个零依赖的 Node 前端，位于 [`webapp/`](./webapp)：直接输入或粘贴文本，或导入 `.txt` / `.md` 文件，即会自动翻译。单次上限 **2000 字符**，超出直接拒绝，不做截断。
 
+完整文档（配置项、故障排查、静态托管）：**[webapp/README_CN.md](./webapp/README_CN.md)**。
+
+### 快速开始
+
 ```bash
+# 1. 环境：Node >= 20，以及 llama.cpp 提供的 llama-server
+brew install llama.cpp        # 或自行编译 https://github.com/ggml-org/llama.cpp
+
+# 2. 下载模型（约 1.1 GB）——权重不存放在本仓库
 cd webapp
-npm start            # → http://127.0.0.1:8787
+node fetch-model.mjs          # 支持断点续传，并校验大小与 sha256
+
+# 3. 启动
+npm start                     # → http://127.0.0.1:8787
 ```
 
-首次翻译会自动启动 `llama-server` 加载 `Hy-MT2-1.8B-Q4_K_M.gguf`（`-c 8192 -ngl 0`），进程退出时自动回收；若 `127.0.0.1:8080` 上已有服务则直接复用。导入 Markdown 会保留结构——标题、列表、链接与代码块原样保留，只翻译可见文本。
+`fetch-model.mjs` 支持 `--model Q6_K` / `Q8_0` / `all`，`--list` 查看可下载文件，`--out DIR` 指定目录；`huggingface.co` 不可达时自动改用 `hf-mirror.com` 镜像。发现被截断的文件会重新下载，而不是跳过。
+
+之后直接输入、粘贴、导入或拖入文件——输入停顿后自动翻译，`⌘↵` 立即翻译。导入 Markdown 会保留结构：标题、列表、链接与代码块原样保留，只翻译可见文本。首次请求会自动启动 `llama-server` 加载 `Hy-MT2-1.8B-Q4_K_M.gguf`（`-c 8192 -ngl 0`），进程退出时自动回收；若 `127.0.0.1:8080` 上已有服务则直接复用。
 
 同一套界面也可以构建成纯静态文件（无后端，`npm run build:pages` 生成 `docs/`），可由任意静态托管服务提供。此时浏览器直接请求你在页面上配置的 OpenAI 兼容端点——因此要注意：**托管出去的页面无法访问你本机的模型**。浏览器会拦截公网 HTTPS 页面对 `http://127.0.0.1` 的请求（本地网络访问策略），请求立即以 `Failed to fetch` 失败，`llama-server` 也不会返回 `Access-Control-Allow-Private-Network` 许可头。本机模型请用**本地模式**（`npm start`）；静态版本只适合配合公网可访问的 HTTPS 端点使用。
 

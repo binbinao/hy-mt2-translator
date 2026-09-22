@@ -233,14 +233,27 @@ For detailed training documentation, please refer to: [Model Training Guide](./t
 
 ## Local Translation Frontend
 
-A zero-dependency Node frontend for this GGUF release lives in [`webapp/`](./webapp): type or paste text, or import a `.txt` / `.md` file, and it translates automatically. Each request is capped at **2000 characters** — over that it refuses rather than truncating.
+A zero-dependency Node front end for this GGUF release lives in [`webapp/`](./webapp): type or paste text, or import a `.txt` / `.md` file, and it translates automatically. Each request is capped at **2000 characters** — over that it refuses rather than truncating.
+
+Full guide — configuration, troubleshooting, static hosting: **[webapp/README.md](./webapp/README.md)**.
+
+### Quick start
 
 ```bash
+# 1. prerequisites: Node >= 20, plus llama-server from llama.cpp
+brew install llama.cpp        # or build https://github.com/ggml-org/llama.cpp
+
+# 2. fetch a model (~1.1 GB) — the weights are not stored in this repository
 cd webapp
-npm start            # → http://127.0.0.1:8787
+node fetch-model.mjs          # resumable; verifies size and sha256
+
+# 3. run
+npm start                     # → http://127.0.0.1:8787
 ```
 
-The first request starts `llama-server` against `Hy-MT2-1.8B-Q4_K_M.gguf` (`-c 8192 -ngl 0`) and reaps it on exit; a server already listening on `127.0.0.1:8080` is reused instead. Markdown imports keep their structure: headings, lists, links and code fences survive, only the visible text is translated.
+`fetch-model.mjs` takes `--model Q6_K` / `Q8_0` / `all`, `--list` for available files, `--out DIR` to save elsewhere, and falls back to the `hf-mirror.com` mirror when `huggingface.co` is unreachable. It repairs interrupted downloads it finds rather than skipping them.
+
+Then type, paste, import or drag a file — translation starts once you pause, or immediately with `⌘↵`. Markdown imports keep their structure: headings, lists, links and code fences survive, only the visible text is translated. The first request starts `llama-server` against `Hy-MT2-1.8B-Q4_K_M.gguf` (`-c 8192 -ngl 0`) and reaps it on exit; a server already listening on `127.0.0.1:8080` is reused untouched.
 
 The same UI can also be built as plain static files with no backend: `npm run build:pages` emits `docs/`, which you can serve from any static host. In that mode the browser talks directly to an OpenAI-compatible endpoint configured on the page — so note that a *hosted* page cannot reach a model on your machine: browsers block a public HTTPS page from calling `http://127.0.0.1` (local network access policy), the request fails immediately with `Failed to fetch`, and `llama-server` does not send the `Access-Control-Allow-Private-Network` opt-in header. Use **local mode** (`npm start`) with a local model, and the static build only with an HTTPS endpoint that is publicly reachable.
 

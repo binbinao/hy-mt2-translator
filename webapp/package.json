@@ -10,6 +10,7 @@
   "scripts": {
     "start": "node server.mjs",
     "dev": "node --watch server.mjs",
+    "fetch-model": "node fetch-model.mjs",
     "build:pages": "node build-pages.mjs"
   }
 }

@@ -68,13 +68,14 @@ A zero-dependency Node 22 tool that turns one of the GGUFs into a browser transl
 browser  →  POST /api/translate (SSE out)
               → validate with public/limit.mjs   (413 before any streaming)
               → lib/model.mjs ensures llama-server is up (auto-spawn, per-run API key)
-              → lib/translate.mjs builds the README prompt, streams /v1/chat/completions
+              → public/translate.mjs builds the model-card prompt, streams /v1/chat/completions
          ←  event: start / delta / done | error
 ```
 
-- `public/limit.mjs` and `public/languages.mjs` are **isomorphic**: the browser imports them as `/limit.mjs` and `/languages.mjs`, the server imports the same files from disk. The 2000-character budget therefore cannot drift between client and server.
+- `public/limit.mjs`, `public/languages.mjs` and `public/translate.mjs` are **isomorphic**: the browser imports them as `/limit.mjs` etc., the server imports the same files from disk. The 2000-character budget, the language table and the prompt text therefore cannot drift between client and server.
+- `fetch-model.mjs` exists because the weights are deliberately absent from git; it is the only supported way a fresh clone gets a runnable model.
 - The model server is spawned with `--api-key <per-run uuid>` and `--no-webui`, so a stray page on the machine cannot drive the model port; the key never reaches the browser.
-- Prompts come from the README templates (`lib/translate.mjs`): the default translation template, plus the "Structured Data 1" template when Markdown structure must be preserved. No system message — the model has no default system prompt.
+- Prompts come from the model card's templates (`public/translate.mjs`): the default translation template, plus the "Structured Data 1" template when Markdown structure must be preserved. No system message — the model has no default system prompt.
 
 ## Key Directories
 
@@ -82,7 +83,7 @@ browser  →  POST /api/translate (SSE out)
 |---|---|
 | `*.gguf` (root) | Released quantizations (Git LFS). Never edit these by hand. |
 | `imgs/` | `logo-en.png`, `logo-zh.png`, `main_result.png` only. |
-| `webapp/` | Node translation frontend: `server.mjs`, `lib/`, `public/`. Not an npm package — no dependencies, no build step. |
+| `webapp/` | Node translation frontend: `server.mjs`, `lib/`, `public/`, `fetch-model.mjs`. Not an npm package — no dependencies, no build step. |
 | `train/deepspeed_support/` | Bare DeepSpeed stack: `train.py`, `train_dense.py`, `merge_lora_weight.py`, 4 launcher `.sh`, 5 `ds_*.json`. |
 | `train/llama_factory_support/` | LLaMA-Factory stack: 2 entry wrappers, 3 template/patch modules, 6 SFT YAMLs, 3 `ds_*.json`, 3 launcher `.sh`, `dataset_info.json`. |
 | `train/tools/` | Standalone checkpoint CLI utilities (stdlib `argparse`). |
@@ -110,8 +111,11 @@ Benchmark: `llama-bench -m <file>.gguf -ngl 0` (note the README's `model_zoo/mod
 
 ```bash
 cd webapp
+node fetch-model.mjs      # ~1.1 GB weights into the repo root; the repo ships code, not weights
 npm start                 # → http://127.0.0.1:8787  (no dependencies to install)
 ```
+
+The weights are never committed here — `*.gguf` is in `.gitignore`, and a fresh clone has no model until `fetch-model.mjs` runs. That script is resumable, verifies size plus LFS `sha256`, repairs truncated files instead of skipping them, and falls back to `hf-mirror.com` when `huggingface.co` is unreachable (`HF_ENDPOINT` / `--endpoint` to choose). A truncated `.gguf` still parses its metadata but fails in llama.cpp with `failed to load model` — the size/hash check is what catches it.
 
 `npm start` only serves the UI. The first translation (or startup) spawns `llama-server` against `../Hy-MT2-1.8B-Q4_K_M.gguf` with `-c 8192 -ngl 0`, and that child is killed when the Node process exits. Environment knobs: `PORT`, `MODEL_ORIGIN`, `MODEL_PATH` / `MODEL_NAME`, `LLAMA_SERVER`, `CTX`, `NGL`, `THREADS`, `AUTO_START=0` (never spawn — expect an existing server), `MODEL_TIMEOUT_MS`.
 
@@ -197,7 +201,9 @@ python train/tools/check_converted.py <outer_dir> [--spot-check 3]   # exit 0 = 
 | `train/llama_factory_support/dataset_info.json` | Dataset registry for sharegpt `{"messages": [...]}` JSONL. |
 | `train/llama_factory_support/convert_zero_to_hf.sh` | ZeRO → HF conversion (3 steps, embedded Python heredoc). |
 | `train/tools/convert_ckpt_to_outer.py`, `check_converted.py` | Checkpoint format conversion and validation. |
-| `webapp/server.mjs`, `webapp/lib/model.mjs`, `webapp/lib/translate.mjs` | Frontend server, model-server lifecycle, prompt construction + upstream streaming. |
+| `webapp/server.mjs`, `webapp/lib/model.mjs`, `webapp/public/translate.mjs` | Frontend server, model-server lifecycle, prompt construction + upstream streaming. |
+| `webapp/fetch-model.mjs` | Downloads the GGUF weights from HuggingFace (resumable, size + sha256 verified, mirror fallback). |
+| `webapp/README.md`, `webapp/README_CN.md` | The frontend's usage guide: quick start, configuration, troubleshooting. |
 | `webapp/public/limit.mjs`, `webapp/public/languages.mjs` | Isomorphic limit policy and language table — imported by both the browser and the server. |
 | `.gitattributes` | Git LFS rules; the three `.gguf` files and `imgs/main_result.png` are listed individually. |
 
