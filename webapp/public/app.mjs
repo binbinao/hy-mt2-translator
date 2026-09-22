@@ -164,6 +164,14 @@ function saveConn() {
   setStatus('连接设置已保存');
 }
 
+const STATIC_HELP = 'https 页面无法访问 http://127.0.0.1：浏览器会按本地网络访问策略直接拦截，现象是 Failed to fetch。\n'
+  + '本地模型请用本地模式 cd webapp && npm start；要用这个页面，端点必须是 HTTPS 公网地址。';
+
+/** Single wording for every "the browser could not reach your endpoint" path. */
+function showStaticFailure(detail) {
+  showNotice(`${detail}\n${STATIC_HELP}`, 'warn', { label: '测试连接', run: testConn });
+}
+
 async function testConn() {
   saveConn();
   setStatus('正在测试连接…');
@@ -181,13 +189,7 @@ async function testConn() {
   } catch (err) {
     el.dot.dataset.state = 'error';
     el.modelText.textContent = '连接失败';
-    showNotice(
-      `无法连接 ${endpoint}：${String(err.message ?? err)}\n`
-      + '请确认已启动服务，例如：\n'
-      + 'llama-server -m Hy-MT2-1.8B-Q4_K_M.gguf --host 127.0.0.1 --port 8080 -c 8192 -ngl 0\n'
-      + '注意：https 页面无法访问 http://127.0.0.1（浏览器本地网络访问策略会直接拦截，报 Failed to fetch）。\n'
-      + '本地模型请用本地模式 cd webapp && npm start；要用本页则需 HTTPS 公网端点。',
-    );
+    showStaticFailure(`无法连接 ${endpoint}：${String(err.message ?? err)}`);
     setStatus('连接失败');
   }
 }
@@ -319,12 +321,8 @@ async function translate() {
       lastKey = null;
       const message = String(err.message ?? err);
       if (err.needsModel) showNotice(message, 'warn', { label: '启动模型', run: startModel });
-      else if (appMode === 'static') {
-        showNotice(
-          `${message}\n直连 ${endpoint} 失败。若服务已启动，请检查 CORS 与浏览器的本地网络访问限制，或改用本地模式（npm start）。`,
-          'warn', { label: '测试连接', run: testConn },
-        );
-      } else showNotice(message);
+      else if (appMode === 'static') showStaticFailure(`直连 ${endpoint} 失败：${message}`);
+      else showNotice(message);
       setStatus('出错');
     }
   } finally {

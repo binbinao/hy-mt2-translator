@@ -1,12 +1,13 @@
 /**
- * Emits the static build that GitHub Pages serves.
+ * Emits the static build of the desk.
  *
  *   node build-pages.mjs   →  ../docs
  *
  * `public/` is already dependency-free (plain ES modules, no bundler), so the
  * "build" is a copy plus a `.nojekyll` marker. Keeping it a script instead of
  * a hand-maintained `docs/` folder means the published site can never drift
- * from the sources.
+ * from the sources. Serve `docs/` from any static host, or locally with e.g.
+ * `python3 -m http.server -d docs`.
  */
 import { cp, mkdir, readdir, rm, writeFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';

@@ -238,17 +238,7 @@ npm start            # → http://127.0.0.1:8787
 
 首次翻译会自动启动 `llama-server` 加载 `Hy-MT2-1.8B-Q4_K_M.gguf`（`-c 8192 -ngl 0`），进程退出时自动回收；若 `127.0.0.1:8080` 上已有服务则直接复用。导入 Markdown 会保留结构——标题、列表、链接与代码块原样保留，只翻译可见文本。
 
-同一套界面也可以作为纯静态文件运行（无后端，`npm run build:pages` 生成 `docs/`），已发布在 **https://binbinao.github.io/hy-mt2-translator/**，此时浏览器直接请求你在页面上配置的 OpenAI 兼容端点。
-
-GitHub Pages 在这个项目上能做什么、不能做什么（实测结论）：
-
-| | |
-|---|---|
-| ✅ 托管静态界面 | 页面与所有模块都能在 `/hy-mt2-translator/` 子路径下正常加载。 |
-| ❌ 不能运行 `server.mjs` | Pages 没有 Node 运行时，无法启动 `llama-server`，2000 字符上限也只剩前端校验。 |
-| ❌ 不能访问你本机的模型 | 浏览器会拦截公网 HTTPS 页面对 `http://127.0.0.1` 的请求（本地网络访问策略），请求立即以 `Failed to fetch` 失败；`llama-server` 也不会返回 `Access-Control-Allow-Private-Network` 这个许可头。 |
-
-因此：本机模型请用**本地模式**（`npm start`）；Pages 版本只适合配合公网可访问的 HTTPS 端点使用。
+同一套界面也可以构建成纯静态文件（无后端，`npm run build:pages` 生成 `docs/`），可由任意静态托管服务提供。此时浏览器直接请求你在页面上配置的 OpenAI 兼容端点——因此要注意：**托管出去的页面无法访问你本机的模型**。浏览器会拦截公网 HTTPS 页面对 `http://127.0.0.1` 的请求（本地网络访问策略），请求立即以 `Failed to fetch` 失败，`llama-server` 也不会返回 `Access-Control-Allow-Private-Network` 许可头。本机模型请用**本地模式**（`npm start`）；静态版本只适合配合公网可访问的 HTTPS 端点使用。
 
 ## 量化工具
 
