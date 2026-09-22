@@ -1,0 +1,15 @@
+{
+  "name": "hy-mt2-webapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local web frontend for Hy-MT2-1.8B-GGUF: type or import .txt/.md, translate automatically (<= 2000 characters).",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs",
+    "build:pages": "node build-pages.mjs"
+  }
+}

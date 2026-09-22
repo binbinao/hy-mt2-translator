@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>译稿台 · Hy-MT2-1.8B</title>
+<!-- Relative paths only: this page is also published as static files under a
+     sub-path (GitHub Pages /<repo>/), where absolute URLs would 404. -->
+<link rel="stylesheet" href="./styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%23b23a2f'/><text x='16' y='23' font-size='20' text-anchor='middle' fill='%23f4efe6' font-family='Songti SC,serif'>译</text></svg>">
+</head>
+<body>
+<div class="paper">
+
+  <header class="masthead">
+    <div class="masthead__title">
+      <h1>译稿台</h1>
+      <p class="masthead__sub">Hy&#8209;MT2&#8209;1.8B · 本地机器翻译誊录</p>
+    </div>
+    <div class="masthead__meta">
+      <div class="chip chip--quiet" id="modeChip" title="运行模式">检测中…</div>
+      <div class="chip" id="modelChip" title="模型服务状态">
+        <span class="chip__dot" id="modelDot" data-state="idle"></span>
+        <span class="chip__text" id="modelText">检测模型服务…</span>
+      </div>
+      <div class="chip chip--quiet" title="单次可翻译的字符上限">
+        <span class="chip__text">上限 <b id="limitChip">2000</b> 字符</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="bar" aria-label="翻译设置">
+    <div class="bar__group">
+      <button type="button" class="btn btn--ghost" id="importBtn">
+        <span class="btn__glyph" aria-hidden="true">⇪</span> 导入 .txt / .md
+      </button>
+      <input type="file" id="fileInput" class="visually-hidden"
+             accept=".txt,.md,.markdown,.text,text/plain,text/markdown">
+      <span class="bar__hint" id="fileHint">或直接拖入窗口 / 粘贴文本</span>
+    </div>
+
+    <div class="bar__group bar__group--end">
+      <label class="field">
+        <span class="field__label">译为</span>
+        <select id="target" class="select"></select>
+      </label>
+
+      <label class="toggle" title="保留标题、列表、代码块等 Markdown 结构，只翻译可见文本">
+        <input type="checkbox" id="mdToggle">
+        <span class="toggle__track" aria-hidden="true"><span class="toggle__knob"></span></span>
+        <span class="toggle__text">保留 Markdown 结构</span>
+      </label>
+
+      <button type="button" class="btn btn--ink" id="translateBtn">立即翻译 <kbd>⌘↵</kbd></button>
+      <button type="button" class="btn btn--ghost" id="cancelBtn" hidden>停止</button>
+      <button type="button" class="btn btn--ghost" id="clearBtn">清空</button>
+    </div>
+  </section>
+
+  <section class="conn" id="conn" aria-label="直连端点设置" hidden>
+    <div class="conn__row">
+      <label class="field field--grow">
+        <span class="field__label">端点</span>
+        <input type="url" id="connEndpoint" class="input" spellcheck="false"
+               placeholder="http://127.0.0.1:8080">
+      </label>
+      <label class="field">
+        <span class="field__label">API Key</span>
+        <input type="password" id="connKey" class="input" spellcheck="false" placeholder="可留空">
+      </label>
+      <button type="button" class="btn btn--ghost btn--sm" id="connSave">保存</button>
+      <button type="button" class="btn btn--ghost btn--sm" id="connTest">测试连接</button>
+    </div>
+    <p class="conn__hint" id="connHint"></p>
+  </section>
+
+  <div class="notice" id="notice" role="alert" hidden></div>
+
+  <main class="desk">
+    <section class="pane pane--source" aria-labelledby="srcLabel">
+      <header class="pane__head">
+        <h2 id="srcLabel">原文</h2>
+        <span class="pane__stat" id="srcStat">0 字符 · 0 汉字</span>
+      </header>
+      <textarea id="source" class="src" spellcheck="false" autocomplete="off"
+                placeholder="在此输入或粘贴文本；导入 .txt / .md 会自动开始翻译。"></textarea>
+      <footer class="pane__foot">
+        <div class="ruler" id="ruler" role="img" aria-labelledby="rulerText">
+          <div class="ruler__fill" id="rulerFill"></div>
+          <div class="ruler__grid" aria-hidden="true"></div>
+        </div>
+        <p class="ruler__text" id="rulerText">0 / 2000</p>
+      </footer>
+    </section>
+
+    <section class="pane pane--target" aria-labelledby="dstLabel">
+      <header class="pane__head">
+        <h2 id="dstLabel">译文</h2>
+        <span class="pane__stat" id="dstStat">—</span>
+      </header>
+      <div class="out" id="output" tabindex="0" aria-live="polite" aria-busy="false">
+        <div class="out__blank" id="outBlank">
+          <p class="out__blankTitle">译文在此誊录</p>
+          <p class="out__blankBody">输入或导入文稿后自动翻译。单次上限 <b id="blankLimit">2000</b> 字符，超出即拒绝，不做截断。</p>
+        </div>
+      </div>
+      <div class="seal" id="seal" aria-hidden="true"><span>已译</span></div>
+      <footer class="pane__foot pane__foot--end">
+        <p class="meta" id="dstMeta"></p>
+        <div class="pane__actions">
+          <button type="button" class="btn btn--ghost btn--sm" id="copyBtn" disabled>复制</button>
+          <button type="button" class="btn btn--ghost btn--sm" id="downloadBtn" disabled>下载</button>
+        </div>
+      </footer>
+    </section>
+  </main>
+
+  <footer class="colophon">
+    <span id="status" role="status" aria-live="polite">就绪</span>
+  </footer>
+
+  <div class="veil" id="veil" hidden>
+    <div class="veil__card">
+      <span class="veil__glyph" aria-hidden="true">⇣</span>
+      <p class="veil__title">投递文稿</p>
+      <p class="veil__body">松开即可导入 .txt / .md</p>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./app.mjs"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# Model weights are ~3.9 GB and are distributed through HuggingFace, not GitHub:
+#   https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF
+# They are also far over GitHub's 1 GB free Git-LFS allowance, so the release
+# artifacts deliberately stay out of this repository.
+*.gguf
+
+.DS_Store
