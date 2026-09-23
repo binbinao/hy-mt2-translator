@@ -107,6 +107,27 @@ Two behaviours worth knowing:
 
 One hard limitation: a page served over HTTPS from a public origin **cannot** call `http://127.0.0.1`. Browsers block public-to-local requests (local network access policy) and the request fails immediately with `Failed to fetch`; `llama-server` also does not send the `Access-Control-Allow-Private-Network` opt-in header. Use local mode (`npm start`) for a local model, and the static build only with an HTTPS endpoint that is publicly reachable.
 
+## Batch CSV localization
+
+Open `/batch.html` in local mode, paste a CSV with a header row, and choose a target language. The service infers translatable columns, skips identifiers, URLs, email addresses, numbers and code-like values, protects placeholders, and returns both translated CSV and a review report.
+
+The same workflow is available as an API:
+
+```bash
+curl http://127.0.0.1:8787/api/batch/csv \
+  -H 'content-type: application/json' \
+  -d '{"target":"de","csv":"sku,name,description\nA-100,Wireless Mouse,Compact ergonomic mouse"}'
+```
+
+Optional fields:
+
+- `columns`: header names or zero-based column indexes to translate explicitly.
+- `glossary`: `[{"source":"Wireless Mouse","target":"Funkmaus"}]`.
+- `delimiter`: `,`, `;`, or `\t`.
+- `concurrency`: worker count, default `2`.
+
+The batch limits are 200 translated cells, 2000 characters per cell and 20000 characters per request.
+
 ## How it fits together
 
 ```

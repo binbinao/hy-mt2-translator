@@ -462,6 +462,26 @@ kbd {
   gap: 1rem;
 }
 
+/* ---------- batch CSV desk ---------- */
+
+.batch { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.batch .src { min-height: 420px; }
+
+.batch-report {
+  margin-top: 20px;
+  padding: 18px 20px;
+  border: 1px solid var(--rule-2);
+  background: var(--paper-3);
+}
+.batch-report h2 { margin: 0 0 10px; font-size: 1rem; }
+.batch-report pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  line-height: 1.6;
+}
+
 /* ---------- drop veil ---------- */
 
 .veil {
@@ -513,6 +533,7 @@ kbd {
 @media (max-width: 900px) {
   .desk { grid-template-columns: 1fr; gap: 1.8rem 0; }
   .desk::before { display: none; }
+  .batch { grid-template-columns: 1fr; }
   .pane--target .pane__head { border-top: 1px solid var(--rule-2); padding-top: 0.7rem; }
   .src, .out { min-height: 30vh; }
   .bar__group--end { margin-left: 0; width: 100%; }

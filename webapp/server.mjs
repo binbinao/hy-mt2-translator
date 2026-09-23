@@ -18,6 +18,7 @@ import { MAX_CHARS, measure, rejection } from './public/limit.mjs';
 import { LANGUAGES, DEFAULT_TARGET, findLanguage } from './public/languages.mjs';
 import { createModelManager } from './lib/model.mjs';
 import { buildPrompt, streamTranslation } from './public/translate.mjs';
+import { CsvBatchError, translateCsvBatch } from './lib/csv-batch.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(HERE, 'public');
@@ -165,6 +166,36 @@ async function handleTranslate(req, res) {
   }
 }
 
+async function handleCsvBatch(req, res) {
+  let body;
+  try {
+    body = await readBody(req, 2 * 1024 * 1024);
+  } catch (err) {
+    return sendJson(res, err.status ?? 400, { error: err.message });
+  }
+
+  const lang = findLanguage(body.target ?? DEFAULT_TARGET);
+  if (!lang) return sendJson(res, 400, { error: '不支持的目标语言' });
+
+  try {
+    await model.ensure();
+    const result = await translateCsvBatch({
+      csv: body.csv,
+      columns: body.columns,
+      delimiter: body.delimiter,
+      glossary: body.glossary,
+      lang,
+      url: `${MODEL_ORIGIN}/v1/chat/completions`,
+      headers: model.authHeaders(),
+      concurrency: NUM(body.concurrency, 2),
+    });
+    return sendJson(res, 200, result);
+  } catch (err) {
+    if (err instanceof CsvBatchError) return sendJson(res, err.status, { error: err.message });
+    return sendJson(res, 503, { error: String(err.message ?? err), model: model.status() });
+  }
+}
+
 const server = createServer(async (req, res) => {
   const { pathname } = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
   try {
@@ -191,6 +222,10 @@ const server = createServer(async (req, res) => {
     if (pathname === '/api/translate') {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'method not allowed' });
       return await handleTranslate(req, res);
+    }
+    if (pathname === '/api/batch/csv') {
+      if (req.method !== 'POST') return sendJson(res, 405, { error: 'method not allowed' });
+      return await handleCsvBatch(req, res);
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       return sendJson(res, 405, { error: 'method not allowed' });

@@ -107,6 +107,27 @@ node fetch-model.mjs
 
 有一个硬性限制：公网 HTTPS 页面**无法**访问 `http://127.0.0.1`。浏览器会按本地网络访问策略拦截公网到本地的请求，现象是立即 `Failed to fetch`；`llama-server` 也不会返回 `Access-Control-Allow-Private-Network` 许可头。本机模型请用本地模式（`npm start`），静态版本只适合配合公网可访问的 HTTPS 端点。
 
+## CSV 批量本地化
+
+本地模式打开 `/batch.html`，粘贴带表头的 CSV 并选择目标语言。服务会自动识别可翻译列，跳过 ID、SKU、URL、邮箱、纯数字和代码类字段，保护占位符，并同时返回译文 CSV 与审校报告。
+
+相同流程也可以通过 API 调用：
+
+```bash
+curl http://127.0.0.1:8787/api/batch/csv \
+  -H 'content-type: application/json' \
+  -d '{"target":"de","csv":"sku,name,description\nA-100,Wireless Mouse,Compact ergonomic mouse"}'
+```
+
+可选字段：
+
+- `columns`：明确指定要翻译的表头名或零基列号。
+- `glossary`：`[{"source":"Wireless Mouse","target":"Funkmaus"}]`。
+- `delimiter`：`,`、`;` 或 `\t`。
+- `concurrency`：并发数，默认 `2`。
+
+单次限制为 200 个翻译单元格、每格 2000 字符、整批 20000 字符。
+
 ## 结构
 
 ```

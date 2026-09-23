@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>批量表格翻译 · Hy-MT2</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="paper">
+  <header class="masthead">
+    <div class="masthead__title">
+      <h1>批量表格翻译</h1>
+      <p class="masthead__sub">CSV 本地化 · 保留标识字段 · 输出审校报告</p>
+    </div>
+    <div class="masthead__meta">
+      <a class="chip chip--quiet" href="./index.html">返回单篇翻译</a>
+      <div class="chip" id="batchStatus">
+        <span class="chip__dot" data-state="idle"></span>
+        <span class="chip__text">等待导入</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="bar">
+    <div class="bar__group">
+      <label class="field">
+        <span class="field__label">译为</span>
+        <select id="batchTarget" class="select"></select>
+      </label>
+    </div>
+    <div class="bar__group bar__group--end">
+      <button type="button" class="btn btn--ink" id="batchRun">开始翻译</button>
+      <button type="button" class="btn btn--ghost" id="batchDownload" disabled>下载 CSV</button>
+    </div>
+  </section>
+
+  <div class="notice notice--info" id="batchNotice">
+    第一行为表头。系统会跳过 ID、SKU、URL、邮箱、纯数字和代码字段，只翻译疑似自然语言列。
+  </div>
+
+  <main class="batch">
+    <section class="pane pane--source">
+      <header class="pane__head">
+        <h2>输入 CSV</h2>
+        <span class="pane__stat" id="batchInputStat">0 行</span>
+      </header>
+      <textarea id="batchInput" class="src" spellcheck="false" placeholder="sku,name,description,price&#10;A-100,Wireless Mouse,Compact ergonomic mouse,19.99"></textarea>
+    </section>
+    <section class="pane pane--target">
+      <header class="pane__head">
+        <h2>翻译结果</h2>
+        <span class="pane__stat" id="batchResultStat">—</span>
+      </header>
+      <textarea id="batchOutput" class="src" readonly placeholder="结果会显示在这里。"></textarea>
+    </section>
+  </main>
+
+  <section class="batch-report" id="batchReport" hidden>
+    <h2>审校报告</h2>
+    <pre id="batchReportText"></pre>
+  </section>
+
+  <footer class="colophon"><span id="batchMessage">就绪</span></footer>
+</div>
+<script type="module" src="./batch.mjs"></script>
+</body>
+</html>
