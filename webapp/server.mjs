@@ -18,7 +18,9 @@ import { MAX_CHARS, measure, rejection } from './public/limit.mjs';
 import { LANGUAGES, DEFAULT_TARGET, findLanguage } from './public/languages.mjs';
 import { createModelManager } from './lib/model.mjs';
 import { buildPrompt, streamTranslation } from './public/translate.mjs';
-import { CsvBatchError, translateCsvBatch } from './lib/csv-batch.mjs';
+import { CsvBatchError, planCsvBatch, translateCsvPlan } from './lib/csv-batch.mjs';
+import { planXlsxBatch, translateXlsxPlan } from './lib/xlsx-batch.mjs';
+import { createGlossaryStore, mergeGlossaries } from './lib/glossary.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(HERE, 'public');
@@ -33,6 +35,9 @@ const MODEL_ORIGIN = process.env.MODEL_ORIGIN ?? 'http://127.0.0.1:8080';
 const PORT = NUM(process.env.PORT, 8787);
 const MODEL_FILE = process.env.MODEL_PATH
   ?? path.join(REPO_ROOT, process.env.MODEL_NAME ?? 'Hy-MT2-1.8B-Q4_K_M.gguf');
+const GLOSSARY_FILE = process.env.GLOSSARY_FILE
+  ?? path.join(HERE, 'data', 'glossary.json');
+const MAX_XLSX_BYTES = 8 * 1024 * 1024;
 
 const model = createModelManager({
   origin: MODEL_ORIGIN,
@@ -44,6 +49,7 @@ const model = createModelManager({
   autoStart: process.env.AUTO_START !== '0',
   startTimeoutMs: NUM(process.env.MODEL_TIMEOUT_MS, 180_000),
 });
+const glossaryStore = createGlossaryStore(GLOSSARY_FILE);
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -178,18 +184,71 @@ async function handleCsvBatch(req, res) {
   if (!lang) return sendJson(res, 400, { error: '不支持的目标语言' });
 
   try {
-    await model.ensure();
-    const result = await translateCsvBatch({
+    const plan = planCsvBatch({
       csv: body.csv,
       columns: body.columns,
       delimiter: body.delimiter,
-      glossary: body.glossary,
+    });
+    const glossary = mergeGlossaries(await glossaryStore.load(), body.glossary);
+    await model.ensure();
+    const result = await translateCsvPlan({
+      plan,
+      glossary,
       lang,
       url: `${MODEL_ORIGIN}/v1/chat/completions`,
       headers: model.authHeaders(),
       concurrency: NUM(body.concurrency, 2),
     });
     return sendJson(res, 200, result);
+  } catch (err) {
+    if (err instanceof CsvBatchError) return sendJson(res, err.status, { error: err.message });
+    return sendJson(res, 503, { error: String(err.message ?? err), model: model.status() });
+  }
+}
+
+async function handleXlsxBatch(req, res) {
+  let body;
+  try {
+    body = await readBody(req, 12 * 1024 * 1024);
+  } catch (err) {
+    return sendJson(res, err.status ?? 400, { error: err.message });
+  }
+
+  const lang = findLanguage(body.target ?? DEFAULT_TARGET);
+  if (!lang) return sendJson(res, 400, { error: '不支持的目标语言' });
+  if (typeof body.data !== 'string' || body.data.length === 0) {
+    return sendJson(res, 400, { error: '缺少 XLSX data（base64）' });
+  }
+
+  try {
+    const buffer = Buffer.from(body.data, 'base64');
+    if (buffer.length === 0 || buffer.length > MAX_XLSX_BYTES) {
+      return sendJson(res, 413, { error: `XLSX 文件必须在 1 字节到 ${MAX_XLSX_BYTES / 1024 / 1024} MB 之间` });
+    }
+    if (buffer[0] !== 0x50 || buffer[1] !== 0x4b) {
+      return sendJson(res, 400, { error: '文件不是合法的 XLSX（ZIP）包' });
+    }
+    const plan = planXlsxBatch({
+      buffer,
+      columns: body.columns,
+      headerRow: body.headerRow,
+    });
+    const glossary = mergeGlossaries(await glossaryStore.load(), body.glossary);
+    await model.ensure();
+    const result = await translateXlsxPlan({
+      plan,
+      glossary,
+      lang,
+      url: `${MODEL_ORIGIN}/v1/chat/completions`,
+      headers: model.authHeaders(),
+      concurrency: NUM(body.concurrency, 2),
+    });
+    return sendJson(res, 200, {
+      format: 'xlsx',
+      data: result.buffer.toString('base64'),
+      previewCsv: result.previewCsv,
+      report: result.report,
+    });
   } catch (err) {
     if (err instanceof CsvBatchError) return sendJson(res, err.status, { error: err.message });
     return sendJson(res, 503, { error: String(err.message ?? err), model: model.status() });
@@ -226,6 +285,29 @@ const server = createServer(async (req, res) => {
     if (pathname === '/api/batch/csv') {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'method not allowed' });
       return await handleCsvBatch(req, res);
+    }
+    if (pathname === '/api/batch/xlsx') {
+      if (req.method !== 'POST') return sendJson(res, 405, { error: 'method not allowed' });
+      return await handleXlsxBatch(req, res);
+    }
+    if (pathname === '/api/glossary') {
+      if (req.method === 'GET') {
+        try {
+          return sendJson(res, 200, { glossary: await glossaryStore.load() });
+        } catch (err) {
+          return sendJson(res, 500, { error: String(err.message ?? err) });
+        }
+      }
+      if (req.method === 'PUT') {
+        try {
+          const body = await readBody(req);
+          const glossary = await glossaryStore.save(body.glossary ?? []);
+          return sendJson(res, 200, { glossary });
+        } catch (err) {
+          return sendJson(res, err.status ?? 400, { error: String(err.message ?? err) });
+        }
+      }
+      return sendJson(res, 405, { error: 'method not allowed' });
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       return sendJson(res, 405, { error: 'method not allowed' });

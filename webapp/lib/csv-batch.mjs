@@ -127,7 +127,7 @@ function looksLikeIdentifier(value) {
   return false;
 }
 
-function looksLikeText(value) {
+export function looksLikeText(value) {
   const text = value.trim();
   if (text.length < 2 || looksLikeIdentifier(text)) return false;
   const letters = Array.from(text).filter((ch) => /\p{L}/u.test(ch)).length;
@@ -137,7 +137,7 @@ function looksLikeText(value) {
 
 export function detectTranslatableColumns(rows) {
   const headers = rows[0] ?? [];
-  const width = Math.max(...rows.map((row) => row.length), headers.length);
+  const width = rows.reduce((max, row) => Math.max(max, row.length), headers.length);
   return Array.from({ length: width }, (_, index) => {
     const header = String(headers[index] ?? `column_${index + 1}`).trim();
     if (IDENTIFIER_HEADER.test(header)) return false;
@@ -162,8 +162,8 @@ function normalizeHeaders(rows) {
   });
 }
 
-function resolveColumns(headers, requested) {
-  if (requested == null) return detectTranslatableColumns([headers]);
+function resolveColumns(headers, dataRows, requested) {
+  if (requested == null) return detectTranslatableColumns([headers, ...dataRows]);
   if (!Array.isArray(requested)) throw new CsvBatchError('columns 必须是字符串或数字数组');
   return headers.map((header, index) => requested.some((item) => item === header || item === index));
 }
@@ -177,7 +177,7 @@ export function planCsvBatch({ csv, columns = null, delimiter = null }) {
   if (rows.length < 2) throw new CsvBatchError('CSV 至少需要表头和一行数据');
   const headers = normalizeHeaders(rows);
   const dataRows = rows.slice(1).map((row) => Array.from({ length: headers.length }, (_, index) => row[index] ?? ''));
-  const selected = resolveColumns(headers, columns);
+  const selected = resolveColumns(headers, dataRows, columns);
   if (!selected.some(Boolean)) throw new CsvBatchError('没有识别到可翻译列，请通过 columns 明确指定');
 
   const cells = [];
@@ -228,7 +228,7 @@ export function restoreTokens(text, tokens) {
   return { text: restored, missing };
 }
 
-function normalizeGlossary(glossary) {
+export function normalizeGlossary(glossary) {
   if (glossary == null) return [];
   if (!Array.isArray(glossary)) throw new CsvBatchError('glossary 必须是数组');
   if (glossary.length > 50) throw new CsvBatchError('术语表最多 50 条');
@@ -245,7 +245,7 @@ function normalizeGlossary(glossary) {
   });
 }
 
-function buildCsvPrompt({ text, lang, glossary }) {
+export function buildBatchPrompt({ text, lang, glossary }) {
   const base = lang.script === 'hans'
     ? `将以下文本翻译为 ${lang.zh}，注意只需要输出翻译后的结果，不要额外解释：\n\n${text}`
     : `Translate the following text into ${lang.en}. Note that you should only output the translated result without any additional explanation:\n\n${text}`;
@@ -261,23 +261,20 @@ async function translateCell({ url, headers, glossary, lang, source }) {
   await streamTranslation({
     url,
     headers,
-    prompt: buildCsvPrompt({ text: source, lang, glossary }),
+    prompt: buildBatchPrompt({ text: source, lang, glossary }),
     onDelta: (delta) => { output += delta; },
   });
   return output.trim();
 }
 
-export async function translateCsvBatch({
-  csv,
-  columns,
-  delimiter,
+export async function translateCsvPlan({
+  plan,
   glossary,
   lang,
   url,
   headers = {},
   concurrency = 2,
 }) {
-  const plan = planCsvBatch({ csv, columns, delimiter });
   const terms = normalizeGlossary(glossary);
   const report = [];
   let cursor = 0;
@@ -327,4 +324,25 @@ export async function translateCsvBatch({
       cells: report,
     },
   };
+}
+
+export async function translateCsvBatch({
+  csv,
+  columns,
+  delimiter,
+  glossary,
+  lang,
+  url,
+  headers = {},
+  concurrency = 2,
+}) {
+  const plan = planCsvBatch({ csv, columns, delimiter });
+  return translateCsvPlan({
+    plan,
+    glossary,
+    lang,
+    url,
+    headers,
+    concurrency,
+  });
 }

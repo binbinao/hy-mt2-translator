@@ -83,6 +83,7 @@ node fetch-model.mjs
 | `THREADS` | 未设 | CPU 线程数；未设时由 llama.cpp 自行决定。 |
 | `AUTO_START` | `1` | `0` 表示不自动启动，只使用 `MODEL_ORIGIN` 上的服务。 |
 | `MODEL_TIMEOUT_MS` | `180000` | 等待模型就绪的最长时间。 |
+| `GLOSSARY_FILE` | `<webapp>/data/glossary.json` | CSV/XLSX 批处理使用的持久术语表。 |
 
 两个值得了解的行为：
 
@@ -107,9 +108,11 @@ node fetch-model.mjs
 
 有一个硬性限制：公网 HTTPS 页面**无法**访问 `http://127.0.0.1`。浏览器会按本地网络访问策略拦截公网到本地的请求，现象是立即 `Failed to fetch`；`llama-server` 也不会返回 `Access-Control-Allow-Private-Network` 许可头。本机模型请用本地模式（`npm start`），静态版本只适合配合公网可访问的 HTTPS 端点。
 
-## CSV 批量本地化
+## CSV / Excel 批量本地化
 
-本地模式打开 `/batch.html`，粘贴带表头的 CSV 并选择目标语言。服务会自动识别可翻译列，跳过 ID、SKU、URL、邮箱、纯数字和代码类字段，保护占位符，并同时返回译文 CSV 与审校报告。
+本地模式打开 `/batch.html`，导入 `.csv`、`.xlsx`，或直接粘贴带表头的 CSV，并选择目标语言。服务会结合表头和数据行识别可翻译列，跳过 ID、SKU、URL、邮箱、纯数字和代码类字段，保护占位符，并同时返回译文与审校报告。
+
+对于 `.xlsx`，服务会直接重写原工作簿包，保留样式、公式、图片和其他工作表，只替换选中的字符串单元格。公式单元格不会被翻译。
 
 相同流程也可以通过 API 调用：
 
@@ -119,14 +122,34 @@ curl http://127.0.0.1:8787/api/batch/csv \
   -d '{"target":"de","csv":"sku,name,description\nA-100,Wireless Mouse,Compact ergonomic mouse"}'
 ```
 
+Excel 使用 base64 数据：
+
+```bash
+curl http://127.0.0.1:8787/api/batch/xlsx \
+  -H 'content-type: application/json' \
+  -d "{\"target\":\"de\",\"data\":\"$(base64 < catalog.xlsx | tr -d '\n')\"}"
+```
+
 可选字段：
 
 - `columns`：明确指定要翻译的表头名或零基列号。
 - `glossary`：`[{"source":"Wireless Mouse","target":"Funkmaus"}]`。
 - `delimiter`：`,`、`;` 或 `\t`。
+- `headerRow`：Excel 表头行零基索引，默认 `0`。
 - `concurrency`：并发数，默认 `2`。
 
 单次限制为 200 个翻译单元格、每格 2000 字符、整批 20000 字符。
+
+术语可以持久化，后续任务会自动使用：
+
+```bash
+curl http://127.0.0.1:8787/api/glossary
+curl -X PUT http://127.0.0.1:8787/api/glossary \
+  -H 'content-type: application/json' \
+  -d '{"glossary":[{"source":"Wireless Mouse","target":"Funkmaus"}]}'
+```
+
+默认术语文件为 `webapp/data/glossary.json`，可通过 `GLOSSARY_FILE` 覆盖。
 
 ## 结构
 

@@ -24,6 +24,12 @@
 
   <section class="bar">
     <div class="bar__group">
+      <button type="button" class="btn btn--ghost" id="batchImport">导入 CSV / Excel</button>
+      <input type="file" id="batchFile" class="visually-hidden"
+             accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+      <span class="bar__hint" id="batchFileHint">或粘贴 CSV</span>
+    </div>
+    <div class="bar__group">
       <label class="field">
         <span class="field__label">译为</span>
         <select id="batchTarget" class="select"></select>
@@ -37,6 +43,7 @@
 
   <div class="notice notice--info" id="batchNotice">
     第一行为表头。系统会跳过 ID、SKU、URL、邮箱、纯数字和代码字段，只翻译疑似自然语言列。
+    Excel 会保留样式、公式和其他工作表。
   </div>
 
   <main class="batch">

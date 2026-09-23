@@ -83,6 +83,7 @@ Environment variables, all optional:
 | `THREADS` | unset | CPU threads; unset lets llama.cpp decide. |
 | `AUTO_START` | `1` | `0` never spawns a server — expects one at `MODEL_ORIGIN`. |
 | `MODEL_TIMEOUT_MS` | `180000` | How long to wait for the model to become ready. |
+| `GLOSSARY_FILE` | `<webapp>/data/glossary.json` | Persistent glossary used by batch CSV/XLSX jobs. |
 
 Two behaviours worth knowing:
 
@@ -107,9 +108,11 @@ Two behaviours worth knowing:
 
 One hard limitation: a page served over HTTPS from a public origin **cannot** call `http://127.0.0.1`. Browsers block public-to-local requests (local network access policy) and the request fails immediately with `Failed to fetch`; `llama-server` also does not send the `Access-Control-Allow-Private-Network` opt-in header. Use local mode (`npm start`) for a local model, and the static build only with an HTTPS endpoint that is publicly reachable.
 
-## Batch CSV localization
+## Batch CSV / Excel localization
 
-Open `/batch.html` in local mode, paste a CSV with a header row, and choose a target language. The service infers translatable columns, skips identifiers, URLs, email addresses, numbers and code-like values, protects placeholders, and returns both translated CSV and a review report.
+Open `/batch.html` in local mode, import a `.csv` or `.xlsx` file, or paste CSV data, then choose a target language. The service infers translatable columns from the header and data rows, skips identifiers, URLs, email addresses, numbers and code-like values, protects placeholders, and returns translated data plus a review report.
+
+For `.xlsx`, the original package is rewritten in place: styles, formulas, images and unrelated sheets are retained, and only selected string cells are replaced. Formula cells are never translated.
 
 The same workflow is available as an API:
 
@@ -119,14 +122,34 @@ curl http://127.0.0.1:8787/api/batch/csv \
   -d '{"target":"de","csv":"sku,name,description\nA-100,Wireless Mouse,Compact ergonomic mouse"}'
 ```
 
+Excel uses base64 data:
+
+```bash
+curl http://127.0.0.1:8787/api/batch/xlsx \
+  -H 'content-type: application/json' \
+  -d "{\"target\":\"de\",\"data\":\"$(base64 < catalog.xlsx | tr -d '\n')\"}"
+```
+
 Optional fields:
 
 - `columns`: header names or zero-based column indexes to translate explicitly.
 - `glossary`: `[{"source":"Wireless Mouse","target":"Funkmaus"}]`.
 - `delimiter`: `,`, `;`, or `\t`.
+- `headerRow`: zero-based Excel header row, default `0`.
 - `concurrency`: worker count, default `2`.
 
 The batch limits are 200 translated cells, 2000 characters per cell and 20000 characters per request.
+
+Terms can be persisted for every later job:
+
+```bash
+curl http://127.0.0.1:8787/api/glossary
+curl -X PUT http://127.0.0.1:8787/api/glossary \
+  -H 'content-type: application/json' \
+  -d '{"glossary":[{"source":"Wireless Mouse","target":"Funkmaus"}]}'
+```
+
+The default glossary file is `webapp/data/glossary.json`; override it with `GLOSSARY_FILE`.
 
 ## How it fits together
 
