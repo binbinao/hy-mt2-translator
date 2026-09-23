@@ -110,7 +110,10 @@ async function handleTranslate(req, res) {
 
   const text = typeof body.text === 'string' ? body.text : '';
   const mode = body.mode === 'markdown' ? 'markdown' : 'plain';
-  const lang = findLanguage(body.target) ?? findLanguage(DEFAULT_TARGET);
+  const lang = findLanguage(body.target ?? DEFAULT_TARGET);
+  if (!lang) {
+    return sendJson(res, 400, { error: '不支持的目标语言' });
+  }
 
   const report = measure(text, MAX_CHARS);
   if (report.over || report.empty) {

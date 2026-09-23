@@ -61,7 +61,7 @@ Manual alternative: download a file from [huggingface.co/tencent/Hy-MT2-1.8B-GGU
 |---|---|
 | **Input** | Type or paste into 原文; or 导入 `.txt` / `.md`; or drag a file anywhere on the window. Importing translates immediately. |
 | **Auto-translate** | Typing translates once you pause (~0.7 s). `⌘↵` / `Ctrl+Enter` translates now; `Esc` or 停止 cancels mid-stream. |
-| **Target** | 译为 offers the 38 languages from the model card, by full name in both English and Chinese. |
+| **Target** | 译为 offers Chinese, Japanese, English and German, by full name in both English and Chinese. |
 | **Markdown** | 保留 Markdown 结构 keeps headings, lists, links, tables and code fences intact and translates only the visible text — the model card's "Structured Data" prompt. Imports of `.md` switch this on automatically. |
 | **The 2000 limit** | Counted in characters. Over the limit the desk refuses and says by how much — it never silently truncates. Enforced in the browser *and* in the server. |
 | **Output** | Streams in as it is produced, with first-token and total timings. 复制 copies it; 下载 saves `.txt` or `.md` depending on the mode. |
